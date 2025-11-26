@@ -29,29 +29,62 @@ export function startTrackerJob() {
       
       console.log(`📊 Tracking ${players.length} players...`);
       
-      // For each player, fetch rating and save to database
+      let updated = 0;
+      let unchanged = 0;
+      let errors = 0;
+      
+      // For each player, fetch rating and save to database ONLY if changed
       for (const player of players) {
         try {
           const ratingData = await fetchPlayerRating(player.geoguessr_user_id);
           
-          // Extract relevant data
-          const currentRating = ratingData.rating || 0;
-          const division = ratingData.division || 'unranked';
+          // Extract relevant data from API response
+          const currentRating = ratingData.rating || ratingData.divisionNumber || 0;
+          const division = (ratingData.divisionName || ratingData.tier || 'unranked').toLowerCase();
           
-          // Save to rating_history table
-          const { error: insertError } = await supabase
-            .from('rating_history')
-            .insert({
-              player_id: player.id,
-              rating: currentRating,
-              division: division,
-              recorded_at: new Date().toISOString()
-            });
+          // Get player's current rating from database
+          const { data: playerData } = await supabase
+            .from('players')
+            .select('current_rating, division')
+            .eq('id', player.id)
+            .single();
           
-          if (insertError) {
-            console.error(`❌ Error saving rating for ${player.username}:`, insertError);
+          // Check if rating or division has changed
+          const ratingChanged = playerData.current_rating !== currentRating;
+          const divisionChanged = playerData.division !== division;
+          
+          if (ratingChanged || divisionChanged) {
+            // Update player's current rating
+            await supabase
+              .from('players')
+              .update({
+                current_rating: currentRating,
+                division: division,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', player.id);
+            
+            // Save to rating_history table ONLY when changed
+            const { error: insertError } = await supabase
+              .from('rating_history')
+              .insert({
+                player_id: player.id,
+                rating: currentRating,
+                division: division,
+                recorded_at: new Date().toISOString()
+              });
+            
+            if (insertError) {
+              console.error(`❌ Error saving rating for ${player.username}:`, insertError);
+              errors++;
+            } else {
+              updated++;
+              const change = currentRating - playerData.current_rating;
+              const changeStr = change > 0 ? `+${change}` : change;
+              console.log(`✅ ${player.username}: ${playerData.current_rating} → ${currentRating} (${changeStr})`);
+            }
           } else {
-            console.log(`✅ ${player.username}: ${currentRating} (${division})`);
+            unchanged++;
           }
           
           // Pause between requests to avoid spamming the API
@@ -59,8 +92,11 @@ export function startTrackerJob() {
           
         } catch (error) {
           console.error(`❌ Error processing ${player.username}:`, error.message);
+          errors++;
         }
       }
+      
+      console.log(`\n📊 Summary: ${updated} updated | ${unchanged} unchanged | ${errors} errors`);
       
       console.log('✅ Tracking job completed');
       

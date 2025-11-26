@@ -4,6 +4,28 @@ import axios from 'axios';
 
 const API_URL = 'http://localhost:3001/api';
 
+// Format division for display - converts roman numerals to arabic
+const formatDivision = (division) => {
+  if (!division) return 'Unranked';
+  
+  const cleanDiv = division.toString().toLowerCase().trim();
+  const parts = cleanDiv.split(/[_\s-]+/);
+  
+  const rank = parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1) : '';
+  
+  const romanToArabic = {
+    'i': '1',
+    'ii': '2', 
+    'iii': '3',
+    'iv': '4',
+    'v': '5'
+  };
+  
+  const tier = parts[1] ? (romanToArabic[parts[1]] || parts[1]) : '';
+  
+  return tier ? `${rank} ${tier}` : rank;
+};
+
 function Search() {
   const [username, setUsername] = useState('');
   const [searchResults, setSearchResults] = useState(null);
@@ -99,7 +121,7 @@ function Search() {
             </div>
             <div className="text-right">
               <div className="text-3xl font-bold text-indigo-400">{searchResults.current_rating}</div>
-              <div className="text-sm text-gray-400 capitalize">{searchResults.division}</div>
+              <div className="text-sm text-gray-400">{formatDivision(searchResults.division)}</div>
             </div>
           </div>
           

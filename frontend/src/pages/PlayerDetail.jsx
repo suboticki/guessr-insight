@@ -1,13 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import axios from 'axios';
 
 const API_URL = 'http://localhost:3001/api';
 
+// Format division for display - converts roman numerals to arabic
+const formatDivision = (division) => {
+  if (!division) return 'Unranked';
+  
+  const cleanDiv = division.toString().toLowerCase().trim();
+  
+  // Split by underscore, space, or dash
+  const parts = cleanDiv.split(/[_\s-]+/);
+  
+  // Capitalize rank name
+  const rank = parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1) : '';
+  
+  // Convert roman numerals to arabic
+  const romanToArabic = {
+    'i': '1',
+    'ii': '2', 
+    'iii': '3',
+    'iv': '4',
+    'v': '5'
+  };
+  
+  // Get tier and convert if it's roman numeral
+  const tier = parts[1] ? (romanToArabic[parts[1]] || parts[1]) : '';
+  
+  return tier ? `${rank} ${tier}` : rank;
+};
+
 function PlayerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const newlyAdded = location.state?.newlyAdded;
   const [player, setPlayer] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,24 +46,20 @@ function PlayerDetail() {
     fetchPlayerData();
   }, [id]);
 
+  const [stats, setStats] = useState(null);
+
   const fetchPlayerData = async () => {
     try {
       setLoading(true);
       
-      // Fetch player info
-      const playersResponse = await axios.get(`${API_URL}/players`);
-      const playerData = playersResponse.data.players.find(p => p.id === id);
-      
-      if (!playerData) {
-        setError('Player not found');
-        return;
-      }
-      
-      setPlayer(playerData);
+      // Fetch player info directly by ID
+      const playerResponse = await axios.get(`${API_URL}/players/${id}`);
+      setPlayer(playerResponse.data.player);
       
       // Fetch rating history
       const historyResponse = await axios.get(`${API_URL}/players/${id}/history`);
       setHistory(historyResponse.data.history);
+      setStats(historyResponse.data.stats);
       
       setError(null);
     } catch (err) {
@@ -48,17 +73,17 @@ function PlayerDetail() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="text-xl text-gray-400">Loading player data...</div>
+        <div className="text-lg text-gray-600">Loading player data...</div>
       </div>
     );
   }
 
   if (error || !player) {
     return (
-      <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-4">
-        <p className="text-red-400">{error || 'Player not found'}</p>
-        <Link to="/" className="text-indigo-400 hover:text-indigo-300 mt-2 inline-block">
-          ← Back to tracked players
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p className="text-red-600">{error || 'Player not found'}</p>
+        <Link to="/" className="text-teal-600 hover:text-teal-700 mt-2 inline-block font-medium">
+          ← Back home
         </Link>
       </div>
     );
@@ -77,61 +102,225 @@ function PlayerDetail() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Back button */}
-      <Link 
-        to="/" 
-        className="inline-flex items-center text-indigo-400 hover:text-indigo-300 mb-6 transition-colors"
-      >
-        ← Back to tracked players
-      </Link>
 
-      {/* Player header */}
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-8 mb-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-              {player.username}
-            </h1>
-            <p className="text-gray-400">
-              Tracked since {new Date(player.created_at).toLocaleDateString()}
-            </p>
-          </div>
-          <div className="text-left md:text-right">
-            <div className="text-5xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-              {player.current_rating}
-            </div>
-            <div className="text-sm text-gray-400 capitalize mt-1">{player.division}</div>
-          </div>
-        </div>
-      </div>
 
-      {/* Stats */}
-      {history.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
-            <div className="text-sm text-gray-400 mb-1">First Rating</div>
-            <div className="text-3xl font-bold text-gray-200">{history[0].rating}</div>
-          </div>
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
-            <div className="text-sm text-gray-400 mb-1">Current Rating</div>
-            <div className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-              {player.current_rating}
-            </div>
-          </div>
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
-            <div className="text-sm text-gray-400 mb-1">Total Change</div>
-            <div className={`text-3xl font-bold ${
-              player.current_rating - history[0].rating >= 0 ? 'text-green-400' : 'text-red-400'
-            }`}>
-              {player.current_rating - history[0].rating >= 0 ? '+' : ''}
-              {player.current_rating - history[0].rating}
+      {/* New player notification */}
+      {newlyAdded && (
+        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 animate-fadeIn">
+          <div className="flex items-start">
+            <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex-1">
+              <p className="text-blue-800 dark:text-blue-300 font-medium">
+                This player was just added to tracking
+              </p>
+              <p className="text-blue-700 dark:text-blue-400 text-sm mt-1">
+                Historical data will accumulate over time as ratings are tracked hourly.
+              </p>
             </div>
           </div>
         </div>
       )}
 
+      {/* Player header */}
+      <div className="card p-8 mb-6 animate-fadeIn">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div className="flex items-center gap-6">
+            {stats?.avatarUrl ? (
+              <img 
+                src={stats.avatarUrl} 
+                alt={player.username}
+                className="w-20 h-20 rounded-full border-2 border-teal-400/30 dark:border-teal-500/30 shadow-lg object-cover"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 dark:from-teal-600 dark:to-teal-700 flex items-center justify-center text-white text-2xl font-bold border-2 border-teal-400/30 dark:border-teal-500/30 shadow-lg">
+                {player.username.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
+                  {player.username}
+                </h1>
+                {stats?.isVerified && (
+                  <svg 
+                    className="w-8 h-8 text-blue-500" 
+                    fill="currentColor" 
+                    viewBox="0 0 20 20"
+                    title="Verified Account"
+                  >
+                    <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
+              <div className="text-gray-600 dark:text-gray-400 space-y-1">
+                {stats?.level && (
+                  <p className="text-sm">
+                    Level {stats.level} • {stats.totalXP?.toLocaleString()} XP
+                  </p>
+                )}
+                {stats?.accountCreated && (
+                  <p className="text-sm">
+                    Account created: {new Date(stats.accountCreated).toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}
+                  </p>
+                )}
+                <p className="text-sm">
+                  Tracked since {new Date(player.created_at).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="text-left md:text-right">
+            <div className="text-5xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+              {player.current_rating}
+            </div>
+            <div className="text-sm text-gray-400 mt-1">{formatDivision(player.division)}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      {history.length > 0 && stats && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="glass rounded-xl p-6 card-hover animate-fadeIn" style={{ animationDelay: '0.05s' }}>
+              <div className="text-sm text-gray-400 mb-1">Best Recent Rating</div>
+              <div className="text-3xl font-bold text-yellow-400">
+                {stats.playerStats?.maxRating || stats.peakRating}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                {stats.playerStats?.maxRating ? 'Last 20 games' : 'Tracked by us'}
+              </div>
+            </div>
+            <div className="glass rounded-xl p-6 card-hover animate-fadeIn" style={{ animationDelay: '0.1s' }}>
+              <div className="text-sm text-gray-400 mb-1">Current Rating</div>
+              <div className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                {player.current_rating}
+              </div>
+            </div>
+            <div className="glass rounded-xl p-6 card-hover animate-fadeIn" style={{ animationDelay: '0.2s' }}>
+              <div className="text-sm text-gray-400 mb-1">7-Day Change</div>
+              {stats.sevenDayChange !== null ? (
+                <div className={`text-3xl font-bold ${
+                  stats.sevenDayChange >= 0 ? 'text-green-400' : 'text-red-400'
+                }`}>
+                  {stats.sevenDayChange >= 0 ? '+' : ''}
+                  {stats.sevenDayChange}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500 mt-2">
+                  Not enough data yet
+                </div>
+              )}
+              {stats.sevenDayChange !== null && (
+                <div className="text-xs text-gray-500 mt-1">Last 7 days</div>
+              )}
+            </div>
+            <div className="glass rounded-xl p-6 card-hover animate-fadeIn" style={{ animationDelay: '0.25s' }}>
+              <div className="text-sm text-gray-400 mb-1">Account Age</div>
+              {stats.accountCreated ? (
+                <>
+                  <div className="text-3xl font-bold text-blue-400">
+                    {Math.floor((new Date() - new Date(stats.accountCreated)) / (1000 * 60 * 60 * 24 * 365.25))}y
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Since {new Date(stats.accountCreated).toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      year: 'numeric'
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="text-sm text-gray-500 mt-2">Unknown</div>
+              )}
+            </div>
+          </div>
+
+          {/* Competitive/Duel Stats */}
+          {stats.playerStats && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="glass rounded-xl p-6 card-hover animate-fadeIn" style={{ animationDelay: '0.3s' }}>
+                  <div className="text-sm text-gray-400 mb-1">Win Rate</div>
+                  <div className="text-3xl font-bold text-green-400">
+                    {stats.playerStats.winRate}%
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Last {stats.playerStats.totalGames} games: {stats.playerStats.wins}W - {stats.playerStats.losses}L
+                  </div>
+                </div>
+                <div className="glass rounded-xl p-6 card-hover animate-fadeIn" style={{ animationDelay: '0.35s' }}>
+                  <div className="text-sm text-gray-400 mb-1">Win Streak</div>
+                  <div className="text-3xl font-bold text-purple-400">
+                    {stats.playerStats.winStreak}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">Current streak</div>
+                </div>
+                <div className="glass rounded-xl p-6 card-hover animate-fadeIn" style={{ animationDelay: '0.4s' }}>
+                  <div className="text-sm text-gray-400 mb-1">Guessed First</div>
+                  <div className="text-3xl font-bold text-teal-400">
+                    {stats.playerStats.guessedFirstRate}%
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    First guess rate
+                  </div>
+                </div>
+              </div>
+
+              {/* Game Mode Ratings */}
+              {stats.playerStats.gameModeRatings && Object.keys(stats.playerStats.gameModeRatings).length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  {stats.playerStats.gameModeRatings.standardDuels && (
+                    <div className="glass rounded-xl p-6 card-hover animate-fadeIn" style={{ animationDelay: '0.45s' }}>
+                      <div className="text-sm text-gray-400 mb-1">Standard Duels</div>
+                      <div className="text-3xl font-bold text-blue-400">
+                        {stats.playerStats.gameModeRatings.standardDuels}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {stats.playerStats.gamesByMode?.standardDuels || 0} games in last 20
+                      </div>
+                    </div>
+                  )}
+                  {stats.playerStats.gameModeRatings.noMoveDuels && (
+                    <div className="glass rounded-xl p-6 card-hover animate-fadeIn" style={{ animationDelay: '0.5s' }}>
+                      <div className="text-sm text-gray-400 mb-1">No Move Duels</div>
+                      <div className="text-3xl font-bold text-orange-400">
+                        {stats.playerStats.gameModeRatings.noMoveDuels}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {stats.playerStats.gamesByMode?.noMoveDuels || 0} games in last 20
+                      </div>
+                    </div>
+                  )}
+                  {stats.playerStats.gameModeRatings.nmpzDuels && (
+                    <div className="glass rounded-xl p-6 card-hover animate-fadeIn" style={{ animationDelay: '0.55s' }}>
+                      <div className="text-sm text-gray-400 mb-1">NMPZ Duels</div>
+                      <div className="text-3xl font-bold text-pink-400">
+                        {stats.playerStats.gameModeRatings.nmpzDuels}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {stats.playerStats.gamesByMode?.nmpzDuels || 0} games in last 20
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+
       {/* Rating history chart */}
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6 mb-6">
+      <div className="glass rounded-xl p-6 mb-6 animate-fadeIn" style={{ animationDelay: '0.4s' }}>
         <h2 className="text-2xl font-bold mb-4 text-white">Rating History</h2>
         
         {history.length === 0 ? (
@@ -170,8 +359,8 @@ function PlayerDetail() {
                         <p className="text-indigo-400 font-bold mt-1">
                           Rating: {payload[0].value}
                         </p>
-                        <p className="text-sm capitalize text-gray-300">
-                          Division: {payload[0].payload.division}
+                        <p className="text-sm text-gray-300">
+                          Division: {formatDivision(payload[0].payload.division)}
                         </p>
                       </div>
                     );
@@ -195,7 +384,7 @@ function PlayerDetail() {
 
       {/* History table */}
       {history.length > 0 && (
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
+        <div className="glass rounded-xl p-6 animate-fadeIn" style={{ animationDelay: '0.5s' }}>
           <h2 className="text-2xl font-bold mb-4 text-white">Detailed History</h2>
           <div className="overflow-x-auto">
             <table className="min-w-full">
@@ -221,8 +410,8 @@ function PlayerDetail() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-indigo-400">
                       {entry.rating}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 capitalize">
-                      {entry.division}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                      {formatDivision(entry.division)}
                     </td>
                   </tr>
                 ))}

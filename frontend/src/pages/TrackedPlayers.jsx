@@ -4,6 +4,28 @@ import axios from 'axios';
 
 const API_URL = 'http://localhost:3001/api';
 
+// Format division for display - converts roman numerals to arabic
+const formatDivision = (division) => {
+  if (!division) return 'Unranked';
+  
+  const cleanDiv = division.toString().toLowerCase().trim();
+  const parts = cleanDiv.split(/[_\s-]+/);
+  
+  const rank = parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1) : '';
+  
+  const romanToArabic = {
+    'i': '1',
+    'ii': '2', 
+    'iii': '3',
+    'iv': '4',
+    'v': '5'
+  };
+  
+  const tier = parts[1] ? (romanToArabic[parts[1]] || parts[1]) : '';
+  
+  return tier ? `${rank} ${tier}` : rank;
+};
+
 function TrackedPlayers() {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -57,8 +79,8 @@ function TrackedPlayers() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+      <div className="text-center mb-8 animate-fadeIn">
+        <h1 className="text-4xl font-bold mb-3 gradient-shimmer">
           Tracked Players
         </h1>
         <p className="text-gray-400">
@@ -78,10 +100,11 @@ function TrackedPlayers() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {players.map((player) => (
+          {players.map((player, idx) => (
             <div 
               key={player.id} 
-              className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 hover:border-indigo-500 transition-all p-6 group"
+              className="glass rounded-xl hover:border-indigo-500 transition-all p-6 group card-hover animate-fadeIn"
+              style={{ animationDelay: `${idx * 0.1}s` }}
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -108,13 +131,13 @@ function TrackedPlayers() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400">Division</span>
-                  <span className="font-semibold capitalize text-gray-200">{player.division}</span>
+                  <span className="font-semibold text-gray-200">{formatDivision(player.division)}</span>
                 </div>
               </div>
 
               <Link
                 to={`/player/${player.id}`}
-                className="block w-full text-center bg-gradient-to-r from-indigo-500 to-purple-500 text-white py-2.5 rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all font-medium"
+                className="block w-full text-center bg-gradient-to-r from-indigo-500 to-purple-500 text-white py-2.5 rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all font-medium btn-press hover:shadow-lg hover:shadow-indigo-500/30"
               >
                 View Details
               </Link>

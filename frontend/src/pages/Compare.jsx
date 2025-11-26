@@ -4,6 +4,28 @@ import axios from 'axios';
 
 const API_URL = 'http://localhost:3001/api';
 
+// Format division for display - converts roman numerals to arabic
+const formatDivision = (division) => {
+  if (!division) return 'Unranked';
+  
+  const cleanDiv = division.toString().toLowerCase().trim();
+  const parts = cleanDiv.split(/[_\s-]+/);
+  
+  const rank = parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1) : '';
+  
+  const romanToArabic = {
+    'i': '1',
+    'ii': '2', 
+    'iii': '3',
+    'iv': '4',
+    'v': '5'
+  };
+  
+  const tier = parts[1] ? (romanToArabic[parts[1]] || parts[1]) : '';
+  
+  return tier ? `${rank} ${tier}` : rank;
+};
+
 function Compare() {
   const [players, setPlayers] = useState([]);
   const [selectedPlayers, setSelectedPlayers] = useState([]);
@@ -99,8 +121,8 @@ function Compare() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+      <div className="text-center mb-8 animate-fadeIn">
+        <h1 className="text-4xl font-bold mb-3 gradient-shimmer">
           Compare Players
         </h1>
         <p className="text-gray-400">
@@ -109,7 +131,7 @@ function Compare() {
       </div>
 
       {/* Player Selection */}
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6 mb-6">
+      <div className="glass rounded-xl p-6 mb-6 animate-fadeIn">
         <h2 className="text-lg font-semibold mb-4">Select Players ({selectedPlayers.length}/4)</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {players.map((player) => {
@@ -118,10 +140,10 @@ function Compare() {
               <button
                 key={player.id}
                 onClick={() => togglePlayer(player)}
-                className={`p-4 rounded-lg border-2 transition-all text-left ${
+                className={`p-4 rounded-lg border-2 transition-all text-left btn-press ${
                   isSelected
-                    ? 'border-indigo-500 bg-indigo-500/20'
-                    : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
+                    ? 'border-indigo-500 bg-indigo-500/20 shadow-lg shadow-indigo-500/20'
+                    : 'border-slate-600 bg-slate-700/50 hover:border-slate-500 hover:shadow-md'
                 }`}
               >
                 <div className="font-semibold text-white">{player.username}</div>
@@ -161,13 +183,13 @@ function Compare() {
                 <div className="text-3xl font-bold" style={{ color: colors[idx] }}>
                   {player.current_rating}
                 </div>
-                <div className="text-sm text-gray-400 capitalize">{player.division}</div>
+                <div className="text-sm text-gray-400">{formatDivision(player.division)}</div>
               </div>
             ))}
           </div>
 
           {/* Chart */}
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
+          <div className="glass rounded-xl p-6 animate-fadeIn">
             <h2 className="text-xl font-bold mb-4">Rating History Comparison</h2>
             {getChartData().length < 2 ? (
               <div className="text-center py-12 text-gray-400">
