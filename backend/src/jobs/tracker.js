@@ -3,11 +3,11 @@ import { supabase } from '../config/supabase.js';
 import { fetchPlayerRating } from '../services/geoguessr.js';
 
 /**
- * Starts a cron job that tracks players every 10 minutes
+ * Starts a cron job that tracks players every hour
  */
 export function startTrackerJob() {
-  // Runs every 10 minutes
-  cron.schedule('*/10 * * * *', async () => {
+  // Runs every hour at minute 0
+  cron.schedule('0 * * * *', async () => {
     console.log('⏰ Starting tracking job...');
     
     try {
@@ -69,5 +69,5 @@ export function startTrackerJob() {
     }
   });
   
-  console.log('✅ Cron job configured (every 10 minutes)');
+  console.log('✅ Cron job configured (every hour)');
 }
