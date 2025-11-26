@@ -136,6 +136,11 @@ export async function fetchPlayerProfile(userId) {
       profileData.avatarUrl = profileData.flair.avatar.background;
     }
     
+    // Include country code if available
+    if (profileData.countryCode) {
+      profileData.countryCode = profileData.countryCode.toLowerCase();
+    }
+    
     return profileData;
   } catch (error) {
     console.error(`❌ Error fetching profile for ${userId}:`, error.message);

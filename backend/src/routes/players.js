@@ -288,6 +288,117 @@ router.get('/:id/history', async (req, res) => {
     
     if (playerError) throw playerError;
     
+    // Update last_viewed timestamp for tracking rotation
+    await supabase
+      .from('players')
+      .update({ last_viewed: new Date().toISOString() })
+      .eq('id', player.id);
+    
+    // If player is NOT tracked, update their rating now (on-demand update)
+    if (!player.is_tracked) {
+      console.log(`🔄 Player ${player.username} is not tracked, updating on-demand...`);
+      
+      try {
+        const ratingData = await fetchPlayerRating(player.geoguessr_user_id);
+        const currentRating = ratingData.rating || ratingData.divisionNumber || player.current_rating;
+        const division = (ratingData.divisionName || ratingData.tier || player.division).toLowerCase();
+        
+        // Check if rating changed
+        const ratingChanged = player.current_rating !== currentRating;
+        const divisionChanged = player.division !== division;
+        
+        if (ratingChanged || divisionChanged) {
+          // Update player's current rating
+          await supabase
+            .from('players')
+            .update({
+              current_rating: currentRating,
+              division: division,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', player.id);
+          
+          // Save to rating_history
+          await supabase
+            .from('rating_history')
+            .insert({
+              player_id: player.id,
+              rating: currentRating,
+              division: division,
+              recorded_at: new Date().toISOString()
+            });
+          
+          console.log(`✅ Updated ${player.username}: ${player.current_rating} → ${currentRating}`);
+          
+          // Update player object for response
+          player.current_rating = currentRating;
+          player.division = division;
+        } else {
+          console.log(`ℹ️ ${player.username} rating unchanged (${currentRating})`);
+        }
+      } catch (updateError) {
+        console.warn(`⚠️ Could not update rating for ${player.username}:`, updateError.message);
+        // Continue anyway with existing data
+      }
+      
+      // Add this player to tracked rotation (if not in top 300)
+      try {
+        // Check if player is in top 300 by rating
+        const { data: topPlayers } = await supabase
+          .from('players')
+          .select('id')
+          .order('current_rating', { ascending: false })
+          .limit(300);
+        
+        const topIds = topPlayers.map(p => p.id);
+        const isTopPlayer = topIds.includes(player.id);
+        
+        if (!isTopPlayer) {
+          // Not in top 300, so add to rotation
+          console.log(`📌 Adding ${player.username} to tracked rotation...`);
+          
+          // Count currently tracked players (excluding top 300)
+          const { count: trackedCount } = await supabase
+            .from('players')
+            .select('*', { count: 'exact', head: true })
+            .eq('is_tracked', true)
+            .not('id', 'in', `(${topIds.join(',')})`);
+          
+          // If we have 200+ tracked (excluding top 300), remove oldest viewed
+          if (trackedCount >= 200) {
+            const { data: oldestTracked } = await supabase
+              .from('players')
+              .select('id, username')
+              .eq('is_tracked', true)
+              .not('id', 'in', `(${topIds.join(',')})`)
+              .order('last_viewed', { ascending: true, nullsFirst: true })
+              .limit(1)
+              .single();
+            
+            if (oldestTracked) {
+              await supabase
+                .from('players')
+                .update({ is_tracked: false })
+                .eq('id', oldestTracked.id);
+              
+              console.log(`🔄 Removed ${oldestTracked.username} from tracking (oldest viewed)`);
+            }
+          }
+          
+          // Add current player to tracking
+          await supabase
+            .from('players')
+            .update({ is_tracked: true })
+            .eq('id', player.id);
+          
+          console.log(`✅ ${player.username} now tracked`);
+          player.is_tracked = true;
+        }
+      } catch (rotationError) {
+        console.warn(`⚠️ Could not update tracking rotation:`, rotationError.message);
+      }
+    }
+    
     // Get rating history
     const { data, error } = await supabase
       .from('rating_history')
@@ -306,6 +417,7 @@ router.get('/:id/history', async (req, res) => {
     // Fetch profile data and stats
     let accountCreated = null;
     let avatarUrl = null;
+    let countryCode = null;
     let isVerified = false;
     let competitiveStats = null;
     let totalXP = 0;
@@ -316,6 +428,7 @@ router.get('/:id/history', async (req, res) => {
       const profileData = await fetchPlayerProfile(player.geoguessr_user_id);
       accountCreated = profileData?.created || profileData?.createdAt || null;
       avatarUrl = profileData?.avatarUrl || null;
+      countryCode = profileData?.countryCode || null;
       isVerified = profileData?.isVerified || false;
       totalXP = profileData?.progress?.xp || 0;
       level = profileData?.progress?.level || 0;
@@ -412,6 +525,7 @@ router.get('/:id/history', async (req, res) => {
         sevenDayChange,
         accountCreated,
         avatarUrl,
+        countryCode,
         isVerified,
         totalXP,
         level,

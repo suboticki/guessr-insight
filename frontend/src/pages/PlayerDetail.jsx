@@ -89,16 +89,56 @@ function PlayerDetail() {
     );
   }
 
-  // Format data for chart
-  const chartData = history.map(entry => ({
-    date: new Date(entry.recorded_at).toLocaleDateString(),
+  // Format data for chart with smart date formatting based on data points
+  const formatDateForChart = (dateString, dataPointCount) => {
+    const date = new Date(dateString);
+    
+    if (dataPointCount > 60) {
+      // For large datasets (2+ months), show only month and year
+      return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    } else if (dataPointCount > 30) {
+      // For medium datasets (1-2 months), show month and day
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } else {
+      // For small datasets, show full date
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+    }
+  };
+
+  const chartData = history.map((entry, index) => ({
+    id: entry.id || index,
+    date: formatDateForChart(entry.recorded_at, history.length),
+    fullDate: new Date(entry.recorded_at).toLocaleDateString(),
     time: new Date(entry.recorded_at).toLocaleTimeString(),
     rating: entry.rating,
-    division: entry.division
+    division: entry.division,
+    timestamp: new Date(entry.recorded_at).getTime()
   }));
 
-  const minRating = Math.min(...history.map(h => h.rating), 0);
-  const maxRating = Math.max(...history.map(h => h.rating), 100);
+  console.log('Chart data sample:', chartData.slice(0, 3).map(d => ({ rating: d.rating, date: d.fullDate })));
+
+  const minRating = Math.min(...history.map(h => h.rating));
+  const maxRating = Math.max(...history.map(h => h.rating));
+  
+  // Calculate smart Y-axis domain based on rating range
+  const ratingRange = maxRating - minRating;
+  let yAxisMin, yAxisMax;
+  
+  if (ratingRange < 100) {
+    // Very small changes (like 705-740): tight range with minimal padding
+    // Add 30% of range as padding on each side, minimum 20 points
+    const padding = Math.max(20, Math.ceil(ratingRange * 0.3));
+    yAxisMin = Math.floor((minRating - padding) / 10) * 10;
+    yAxisMax = Math.ceil((maxRating + padding) / 10) * 10;
+  } else if (ratingRange < 300) {
+    // Medium changes: moderate padding
+    yAxisMin = Math.floor((minRating - 50) / 50) * 50;
+    yAxisMax = Math.ceil((maxRating + 50) / 50) * 50;
+  } else {
+    // Large changes: standard padding
+    yAxisMin = Math.max(0, Math.floor((minRating - 50) / 100) * 100);
+    yAxisMax = Math.ceil((maxRating + 50) / 100) * 100;
+  }
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -139,10 +179,23 @@ function PlayerDetail() {
               </div>
             )}
             <div>
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
                   {player.username}
                 </h1>
+                {stats?.countryCode && (
+                  <img 
+                    src={`https://flagcdn.com/w40/${stats.countryCode}.png`}
+                    srcSet={`https://flagcdn.com/w80/${stats.countryCode}.png 2x`}
+                    alt={`${stats.countryCode.toUpperCase()} flag`}
+                    className="w-8 h-6 object-cover rounded shadow-sm"
+                    title={stats.countryCode.toUpperCase()}
+                    style={{ imageRendering: 'crisp-edges' }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                )}
                 {stats?.isVerified && (
                   <svg 
                     className="w-8 h-8 text-blue-500" 
@@ -335,33 +388,52 @@ function PlayerDetail() {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={chartData}>
+            <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis 
-                dataKey="date" 
+                dataKey="timestamp"
+                type="number"
+                domain={['dataMin', 'dataMax']}
+                tickFormatter={(timestamp) => {
+                  const date = new Date(timestamp);
+                  if (history.length > 60) {
+                    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                  } else if (history.length > 30) {
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  }
+                  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+                }}
                 stroke="#9ca3af"
                 tick={{ fontSize: 12 }}
                 angle={-45}
                 textAnchor="end"
                 height={80}
+                interval="preserveStartEnd"
+                minTickGap={50}
               />
               <YAxis 
                 stroke="#9ca3af"
-                domain={[Math.floor(minRating / 100) * 100, Math.ceil(maxRating / 100) * 100]}
+                domain={[Math.max(0, yAxisMin), yAxisMax]}
+                tick={{ fontSize: 12 }}
+                tickCount={8}
               />
               <Tooltip 
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length > 0) {
+                    const data = payload[0].payload;
                     return (
-                      <div className="bg-slate-800 p-3 border border-slate-600 rounded-lg shadow-xl">
-                        <p className="font-semibold text-white">{payload[0].payload.date}</p>
-                        <p className="text-sm text-gray-400">{payload[0].payload.time}</p>
-                        <p className="text-indigo-400 font-bold mt-1">
-                          Rating: {payload[0].value}
-                        </p>
-                        <p className="text-sm text-gray-300">
-                          Division: {formatDivision(payload[0].payload.division)}
-                        </p>
+                      <div className="bg-slate-800/95 backdrop-blur-sm p-4 border-2 border-indigo-500/50 rounded-xl shadow-2xl">
+                        <p className="font-bold text-white text-base mb-1">{data.fullDate}</p>
+                        <p className="text-xs text-gray-400 mb-2">{data.time}</p>
+                        <div className="border-t border-slate-600 pt-2 mt-2">
+                          <p className="text-xs text-gray-400 mb-1">Rating</p>
+                          <p className="text-indigo-400 font-bold text-xl">
+                            {data.rating}
+                          </p>
+                          <p className="text-xs text-gray-400 uppercase tracking-wide mt-2">
+                            {formatDivision(data.division)}
+                          </p>
+                        </div>
                       </div>
                     );
                   }
@@ -373,9 +445,9 @@ function PlayerDetail() {
                 type="monotone" 
                 dataKey="rating" 
                 stroke="#6366f1" 
-                strokeWidth={3}
-                dot={{ fill: '#6366f1', r: 4 }}
-                activeDot={{ r: 6 }}
+                strokeWidth={history.length > 50 ? 2 : 3}
+                dot={history.length > 30 ? false : { fill: '#6366f1', r: 4 }}
+                activeDot={{ r: 8, fill: '#818cf8' }}
               />
             </LineChart>
           </ResponsiveContainer>

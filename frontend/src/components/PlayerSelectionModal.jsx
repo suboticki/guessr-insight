@@ -26,12 +26,21 @@ const formatDivision = (division) => {
   return tier ? `${rank} ${tier}` : rank;
 };
 
-function PlayerSelectionModal({ players, onClose, searchQuery }) {
+function PlayerSelectionModal({ players, onClose, searchQuery, onSelectPlayer }) {
   const [addingPlayerId, setAddingPlayerId] = useState(null);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   const handleSelectPlayer = async (player) => {
+    // If custom onSelectPlayer provided (e.g., from Compare page), use it
+    if (onSelectPlayer) {
+      setAddingPlayerId(player.geoguessrId);
+      await onSelectPlayer(player);
+      setAddingPlayerId(null);
+      return;
+    }
+
+    // Default behavior: navigate to player detail
     if (player.isTracked && player.dbPlayer) {
       // Player already tracked, just navigate
       navigate(`/player/${player.dbPlayer.id}`);
@@ -123,9 +132,12 @@ function PlayerSelectionModal({ players, onClose, searchQuery }) {
                       </h3>
                       {player.countryCode && (
                         <img 
-                          src={`https://flagcdn.com/24x18/${player.countryCode.toLowerCase()}.png`}
-                          alt={`${player.countryCode} flag`}
-                          className="w-6 h-4 rounded border border-gray-300 dark:border-gray-600"
+                          src={`https://flagcdn.com/w40/${player.countryCode.toLowerCase()}.png`}
+                          srcSet={`https://flagcdn.com/w80/${player.countryCode.toLowerCase()}.png 2x`}
+                          alt={`${player.countryCode.toUpperCase()} flag`}
+                          className="w-7 h-5 object-cover rounded shadow-sm"
+                          title={player.countryCode.toUpperCase()}
+                          style={{ imageRendering: 'crisp-edges' }}
                           onError={(e) => {
                             e.target.style.display = 'none';
                           }}
