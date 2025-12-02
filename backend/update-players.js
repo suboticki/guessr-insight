@@ -5,17 +5,18 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 async function updateAllPlayers() {
-  console.log('🔄 Updating all players with correct ratings...\n');
+  console.log('🔄 Updating tracked players with correct ratings...\n');
   
   try {
-    // Get all players
+    // Get only tracked players
     const { data: players, error } = await supabase
       .from('players')
-      .select('*');
+      .select('*')
+      .eq('is_tracked', true);
     
     if (error) throw error;
     
-    console.log(`Found ${players.length} players to update\n`);
+    console.log(`Found ${players.length} tracked players to update\n`);
     
     for (const player of players) {
       try {
@@ -51,8 +52,8 @@ async function updateAllPlayers() {
         
         console.log(`  ✅ Updated!\n`);
         
-        // Wait 2 seconds between requests
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Wait 1 second between requests
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
       } catch (err) {
         console.error(`  ❌ Error updating ${player.username}:`, err.message, '\n');

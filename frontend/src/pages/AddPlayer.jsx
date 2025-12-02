@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = 'https://guessr-insight-backend.onrender.com/api';
 
 function AddPlayer() {
   const [username, setUsername] = useState('');

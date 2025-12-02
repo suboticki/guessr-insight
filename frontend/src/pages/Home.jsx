@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import PlayerSelectionModal from '../components/PlayerSelectionModal';
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = 'https://guessr-insight-backend.onrender.com/api';
 
 const POPULAR_PLAYERS = [
   { username: 'zi8gzag', description: 'World Champion' },

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = 'https://guessr-insight-backend.onrender.com/api';
 
 // Format division for display - converts roman numerals to arabic
 const formatDivision = (division) => {
