@@ -41,6 +41,7 @@ function PlayerDetail() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [justAddedToTracking, setJustAddedToTracking] = useState(false);
 
   useEffect(() => {
     fetchPlayerData();
@@ -60,6 +61,7 @@ function PlayerDetail() {
       const historyResponse = await axios.get(`${API_URL}/players/${id}/history`);
       setHistory(historyResponse.data.history);
       setStats(historyResponse.data.stats);
+      setJustAddedToTracking(historyResponse.data.justAddedToTracking || false);
       
       setError(null);
     } catch (err) {
@@ -144,8 +146,8 @@ function PlayerDetail() {
     <div className="max-w-7xl mx-auto">
 
 
-      {/* New player notification */}
-      {newlyAdded && (
+      {/* New player or no history notification */}
+      {(newlyAdded || justAddedToTracking) && (
         <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 animate-fadeIn">
           <div className="flex items-start">
             <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

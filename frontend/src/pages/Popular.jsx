@@ -6,14 +6,14 @@ const API_URL = 'https://guessr-insight-backend.onrender.com/api';
 
 // List of popular/pro GeoGuessr players
 const POPULAR_PLAYERS = [
+  { username: 'Blinky', description: 'Top 1 Champion player' },
   { username: 'GeoPeter', description: 'Pro player and content creator' },
   { username: 'zi8gzag', description: 'Top competitive player' },
   { username: 'Rainbolt', description: 'Famous for instant guessing' },
   { username: 'GeoStique', description: 'High-ranked competitive player' },
-  { username: 'subi', description: 'Competitive player' },
-  { username: 'vukGG', description: 'Strong duels player' },
   { username: 'Chicago Geographer', description: 'Educational content' },
   { username: 'Consus', description: 'Top ranked player' },
+  { username: 'Kodiak', description: 'High-ranked duels player' },
 ];
 
 function Popular() {

@@ -6,12 +6,12 @@ import PlayerSelectionModal from '../components/PlayerSelectionModal';
 const API_URL = 'https://guessr-insight-backend.onrender.com/api';
 
 const POPULAR_PLAYERS = [
-  { username: 'zi8gzag', description: 'World Champion' },
-  { username: 'blinky', description: 'Top Competitor' },
+  { username: 'Blinky', description: 'Top 1 Champion' },
+  { username: 'zi8gzag', description: 'Elite competitor and content creator' },
   { username: 'Rainbolt', description: 'Geography Legend' },
-  { username: 'GeoPeter', description: 'Elite Player' },
-  { username: 'GeoStique', description: 'Pro Streamer' },
-  { username: 'Chicago Geographer', description: 'US Expert' },
+  { username: 'Jack Massey Welsh', description: 'Content Creator' },
+  { username: 'VukGG', description: 'Professional player' },
+  { username: 'subi', description: 'Boss' },
 ];
 
 function Home() {
@@ -23,11 +23,38 @@ function Home() {
   const [searchResults, setSearchResults] = useState([]);
   const [lastSearchQuery, setLastSearchQuery] = useState('');
   const [allPlayers, setAllPlayers] = useState([]);
+  const [popularPlayersData, setPopularPlayersData] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchAllPlayers();
+    fetchPopularPlayersData();
   }, []);
+
+  const fetchPopularPlayersData = async () => {
+    try {
+      const promises = POPULAR_PLAYERS.map(async (player) => {
+        const response = await axios.post(`${API_URL}/players/search`, {
+          username: player.username
+        });
+        if (response.data.count > 0) {
+          const apiPlayer = response.data.players[0];
+          return {
+            ...player,
+            avatarUrl: apiPlayer.avatarUrl,
+            countryCode: apiPlayer.countryCode,
+            geoguessrId: apiPlayer.geoguessrId
+          };
+        }
+        return player;
+      });
+      const data = await Promise.all(promises);
+      setPopularPlayersData(data);
+    } catch (err) {
+      console.error('Failed to fetch popular players data:', err);
+      setPopularPlayersData(POPULAR_PLAYERS);
+    }
+  };
 
   const fetchAllPlayers = async () => {
     try {
@@ -180,7 +207,7 @@ function Home() {
         </p>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {POPULAR_PLAYERS.map((player) => (
+          {(popularPlayersData.length > 0 ? popularPlayersData : POPULAR_PLAYERS).map((player) => (
             <button
               key={player.username}
               onClick={() => addPopularPlayer(player)}
@@ -188,13 +215,33 @@ function Home() {
               className="card card-hover p-5 text-left disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
-                    {player.username}
-                  </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{player.description}</p>
+                <div className="flex items-start gap-3 flex-1">
+                  {player.avatarUrl && (
+                    <img 
+                      src={player.avatarUrl}
+                      alt={player.username}
+                      className="w-10 h-10 rounded-full flex-shrink-0"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white truncate">
+                        {player.username}
+                      </h3>
+                      {player.countryCode && (
+                        <img
+                          src={`https://flagcdn.com/w20/${player.countryCode.toLowerCase()}.png`}
+                          srcSet={`https://flagcdn.com/w40/${player.countryCode.toLowerCase()}.png 2x`}
+                          alt={`${player.countryCode.toUpperCase()} flag`}
+                          className="w-5 h-auto flex-shrink-0"
+                          title={player.countryCode.toUpperCase()}
+                        />
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{player.description}</p>
+                  </div>
                 </div>
-                <svg className={`w-5 h-5 ${addingPlayer === player.username ? 'text-gray-400 animate-pulse' : 'text-teal-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-5 h-5 flex-shrink-0 ${addingPlayer === player.username ? 'text-gray-400 animate-pulse' : 'text-teal-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </div>

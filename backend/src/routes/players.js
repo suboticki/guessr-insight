@@ -186,6 +186,15 @@ router.post('/add', async (req, res) => {
       });
     }
     
+    // Fetch player profile to get correct username capitalization
+    let correctUsername = username;
+    try {
+      const profileData = await fetchPlayerProfile(geoguessrId);
+      correctUsername = profileData.nick || username;
+    } catch (profileError) {
+      console.warn(`⚠️ Could not fetch profile for ${geoguessrId}, using provided username`);
+    }
+    
     // Fetch rating data with fallback
     let rating = 0;
     let division = 'unranked';
@@ -204,7 +213,7 @@ router.post('/add', async (req, res) => {
       .from('players')
       .insert({
         geoguessr_user_id: geoguessrId,
-        username: username,
+        username: correctUsername,
         is_tracked: true,
         current_rating: rating,
         division: division.toLowerCase()
@@ -294,6 +303,9 @@ router.get('/:id/history', async (req, res) => {
       .update({ last_viewed: new Date().toISOString() })
       .eq('id', player.id);
     
+    // Track if player was just added to tracking (for frontend notification)
+    let justAddedToTracking = false;
+    
     // If player is NOT tracked, update their rating now (on-demand update)
     if (!player.is_tracked) {
       console.log(`🔄 Player ${player.username} is not tracked, updating on-demand...`);
@@ -353,7 +365,18 @@ router.get('/:id/history', async (req, res) => {
         const topIds = topPlayers.map(p => p.id);
         const isTopPlayer = topIds.includes(player.id);
         
-        if (!isTopPlayer) {
+        if (isTopPlayer) {
+          // Player is in top 300, so they should always be tracked
+          console.log(`🏆 ${player.username} is in top 300, adding to tracking...`);
+          await supabase
+            .from('players')
+            .update({ is_tracked: true })
+            .eq('id', player.id);
+          
+          console.log(`✅ ${player.username} now tracked (top 300)`);
+          player.is_tracked = true;
+          justAddedToTracking = true;
+        } else {
           // Not in top 300, so add to rotation
           console.log(`📌 Adding ${player.username} to tracked rotation...`);
           
@@ -393,6 +416,7 @@ router.get('/:id/history', async (req, res) => {
           
           console.log(`✅ ${player.username} now tracked`);
           player.is_tracked = true;
+          justAddedToTracking = true;
         }
       } catch (rotationError) {
         console.warn(`⚠️ Could not update tracking rotation:`, rotationError.message);
@@ -519,6 +543,7 @@ router.get('/:id/history', async (req, res) => {
     res.json({ 
       success: true, 
       history: data,
+      justAddedToTracking,
       stats: {
         peakRating,
         bestEverRating,
