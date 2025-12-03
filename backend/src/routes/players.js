@@ -54,13 +54,10 @@ router.post('/search', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Username is required' });
     }
     
-    console.log(`🔍 Searching GeoGuessr for: ${username}`);
-    
     // Search for players on GeoGuessr API
     let searchResults;
     try {
       searchResults = await searchPlayer(username);
-      console.log(`📊 GeoGuessr raw response:`, JSON.stringify(searchResults, null, 2));
     } catch (searchError) {
       console.error(`❌ Search API error:`, searchError.message);
       return res.status(404).json({ success: false, error: 'Player not found on GeoGuessr' });
@@ -69,19 +66,12 @@ router.post('/search', async (req, res) => {
     // Handle different response structures
     let players = [];
     if (Array.isArray(searchResults)) {
-      console.log('✅ Response is array');
       players = searchResults;
     } else if (searchResults && searchResults.items) {
-      console.log('✅ Response has items property');
       players = searchResults.items;
     } else if (searchResults && searchResults.users) {
-      console.log('✅ Response has users property');
       players = searchResults.users;
-    } else if (searchResults && typeof searchResults === 'object') {
-      console.log('⚠️ Response is object, checking all keys:', Object.keys(searchResults));
     }
-    
-    console.log(`📊 Extracted ${players?.length || 0} players from response`);
     
     if (!players || players.length === 0) {
       return res.status(404).json({ success: false, error: 'Player not found on GeoGuessr' });
@@ -92,8 +82,6 @@ router.post('/search', async (req, res) => {
       const playerName = (p.name || p.nick || '').toLowerCase();
       return playerName === username.toLowerCase();
     });
-    
-    console.log(`📊 Exact matches: ${exactMatches.length} out of ${players.length} results`);
     
     if (exactMatches.length === 0) {
       return res.status(404).json({ success: false, error: 'Player not found on GeoGuessr' });
@@ -140,8 +128,6 @@ router.post('/search', async (req, res) => {
       if (aRating !== bRating) return bRating - aRating; // Higher rating first
       return b.xp - a.xp; // Then by XP
     });
-    
-    console.log(`✅ Found ${enrichedResults.length} valid players with exact name match`);
     
     res.json({ 
       success: true, 
@@ -340,13 +326,9 @@ router.get('/:id/history', async (req, res) => {
               recorded_at: new Date().toISOString()
             });
           
-          console.log(`✅ Updated ${player.username}: ${player.current_rating} → ${currentRating}`);
-          
           // Update player object for response
           player.current_rating = currentRating;
           player.division = division;
-        } else {
-          console.log(`ℹ️ ${player.username} rating unchanged (${currentRating})`);
         }
       } catch (updateError) {
         console.warn(`⚠️ Could not update rating for ${player.username}:`, updateError.message);
@@ -512,7 +494,14 @@ router.get('/:id/history', async (req, res) => {
           
           // Game mode breakdown
           gamesByMode: gameHistory.gamesByMode,
-          gameModeRatings: progressData?.gameModeRatings || {}
+          gameModeRatings: progressData?.gameModeRatings || {},
+          
+          // Recent games for display
+          recentGames: gameHistory.recentGames || [],
+          
+          // Best and worst countries
+          bestCountries: progressData?.bestCountries || [],
+          worstCountries: progressData?.worstCountries || []
         };
         
         // Use 7-day change from game history if available

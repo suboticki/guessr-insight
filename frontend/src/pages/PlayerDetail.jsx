@@ -117,8 +117,6 @@ function PlayerDetail() {
     timestamp: new Date(entry.recorded_at).getTime()
   }));
 
-  console.log('Chart data sample:', chartData.slice(0, 3).map(d => ({ rating: d.rating, date: d.fullDate })));
-
   const minRating = Math.min(...history.map(h => h.rating));
   const maxRating = Math.max(...history.map(h => h.rating));
   
@@ -371,6 +369,69 @@ function PlayerDetail() {
               )}
             </>
           )}
+          
+          {/* Country Strengths */}
+          {stats.playerStats && (stats.playerStats.bestCountries?.length > 0 || stats.playerStats.worstCountries?.length > 0) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {/* Best Countries */}
+              {stats.playerStats.bestCountries?.length > 0 && (
+                <div className="glass rounded-xl p-6 animate-fadeIn" style={{ animationDelay: '0.6s' }}>
+                  <h3 className="text-lg font-semibold mb-4 text-green-400">
+                    Strongest Countries
+                  </h3>
+                  <div className="space-y-2">
+                    {stats.playerStats.bestCountries.map((countryCode, idx) => {
+                      const countryName = new Intl.DisplayNames(['en'], { type: 'region' }).of(countryCode.toUpperCase());
+                      return (
+                        <div key={countryCode} className="flex items-center gap-4 p-3 rounded-lg bg-green-400/15 hover:bg-green-400/25 transition-colors border border-green-400/30">
+                          <div className="text-sm font-medium text-gray-400 w-6">
+                            {idx + 1}.
+                          </div>
+                          <img 
+                            src={`https://flagcdn.com/48x36/${countryCode}.png`}
+                            alt={countryName}
+                            className="w-10 h-8 rounded shadow-md"
+                          />
+                          <div className="text-white font-medium text-sm">
+                            {countryName}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {/* Worst Countries */}
+              {stats.playerStats.worstCountries?.length > 0 && (
+                <div className="glass rounded-xl p-6 animate-fadeIn" style={{ animationDelay: '0.65s' }}>
+                  <h3 className="text-lg font-semibold mb-4 text-red-400">
+                    Weakest Countries
+                  </h3>
+                  <div className="space-y-2">
+                    {stats.playerStats.worstCountries.map((countryCode, idx) => {
+                      const countryName = new Intl.DisplayNames(['en'], { type: 'region' }).of(countryCode.toUpperCase());
+                      return (
+                        <div key={countryCode} className="flex items-center gap-4 p-3 rounded-lg bg-red-400/15 hover:bg-red-400/25 transition-colors border border-red-400/30">
+                          <div className="text-sm font-medium text-gray-400 w-6">
+                            {idx + 1}.
+                          </div>
+                          <img 
+                            src={`https://flagcdn.com/48x36/${countryCode}.png`}
+                            alt={countryName}
+                            className="w-10 h-8 rounded shadow-md"
+                          />
+                          <div className="text-white font-medium text-sm">
+                            {countryName}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
 
@@ -455,6 +516,115 @@ function PlayerDetail() {
           </ResponsiveContainer>
         )}
       </div>
+
+      {/* Recent Games */}
+      {stats?.playerStats?.recentGames && stats.playerStats.recentGames.length > 0 && (
+        <div className="glass rounded-xl p-6 animate-fadeIn mb-6" style={{ animationDelay: '0.4s' }}>
+          <h2 className="text-2xl font-bold mb-4 text-white">Recent Games</h2>
+          <div className="space-y-3">
+            {stats.playerStats.recentGames.map((game, idx) => {
+              const isWin = game.duel.winnerId === player.geoguessr_user_id;
+              const opponent = game.players.find(p => p.id !== player.geoguessr_user_id);
+              const playerData = game.duel.teams.flatMap(t => t.players).find(p => p.playerId === player.geoguessr_user_id);
+              const gameDate = new Date(game.duel.rounds[0].startTime);
+              const gameMode = game.duel.gameMode.replace('Duels', '').replace(/([A-Z])/g, ' $1').trim();
+              
+              return (
+                <div 
+                  key={game.gameId} 
+                  className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
+                    isWin 
+                      ? 'bg-green-900/20 border-green-500/30 hover:border-green-500/50' 
+                      : 'bg-red-900/20 border-red-500/30 hover:border-red-500/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl ${
+                      isWin ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                    }`}>
+                      {isWin ? 'W' : 'L'}
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      {opponent?.pin?.url && (
+                        <img 
+                          src={`https://www.geoguessr.com/images/resize:auto:48:48/gravity:ce/plain/${opponent.pin.url}`}
+                          alt={opponent.nick}
+                          className="w-10 h-10 rounded-full border-2 border-slate-600"
+                        />
+                      )}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={async () => {
+                              if (opponent?.nick && opponent?.id) {
+                                try {
+                                  // Search for player in database
+                                  const searchResponse = await axios.post(`${API_URL}/players/search`, {
+                                    username: opponent.nick
+                                  });
+                                  
+                                  if (searchResponse.data.success && searchResponse.data.players.length > 0) {
+                                    const foundPlayer = searchResponse.data.players[0];
+                                    
+                                    // Check if player is already in database (has dbPlayer.id)
+                                    if (foundPlayer.dbPlayer?.id) {
+                                      // Player exists in DB - navigate to their page
+                                      navigate(`/player/${foundPlayer.dbPlayer.id}`);
+                                    } else {
+                                      // Player found on GeoGuessr but not in DB - add them
+                                      const addResponse = await axios.post(`${API_URL}/players/add`, {
+                                        geoguessrId: foundPlayer.geoguessrId,
+                                        username: foundPlayer.username
+                                      });
+                                      
+                                      if (addResponse.data.success && addResponse.data.player?.id) {
+                                        navigate(`/player/${addResponse.data.player.id}`);
+                                      }
+                                    }
+                                  } else {
+                                    // Player not found on GeoGuessr - shouldn't happen but handle it
+                                    console.error('Player not found on GeoGuessr');
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to navigate to opponent:', err);
+                                }
+                              }
+                            }}
+                            className="text-white font-semibold hover:text-teal-400 transition-colors cursor-pointer"
+                          >
+                            {opponent?.nick || 'Unknown'}
+                          </button>
+                          {opponent?.countryCode && (
+                            <img 
+                              src={`https://flagcdn.com/24x18/${opponent.countryCode}.png`}
+                              alt={opponent.countryCode}
+                              className="w-6 h-4 rounded"
+                            />
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-400 flex items-center gap-2">
+                          <span>{gameMode}</span>
+                          <span>•</span>
+                          <span>{gameDate.toLocaleDateString()}</span>
+                          <span>{gameDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="text-right">
+                    <div className="text-indigo-400 font-bold text-lg">
+                      {playerData?.rankedSystemRating || 'N/A'}
+                    </div>
+                    <div className="text-xs text-gray-500">Rating</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* History table */}
       {history.length > 0 && (
